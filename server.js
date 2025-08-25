@@ -217,6 +217,7 @@ app.post('/consulta-link', async (req, res) => {
   const { data } = req.body;
   const payment_id = data?.id;
   const accessToken = process.env.MERCADOPAGO_ACCESS_TOKEN;
+
   if (!payment_id) {
     return res.status(400).json({ error: 'No se encontró el ID de pago en la estructura recibida.' });
   }
@@ -231,46 +232,42 @@ app.post('/consulta-link', async (req, res) => {
         },
       }
     );
-    
+
     const paymentData = paymentResponse.data;
-    // Obtener ID de la orden (si existe)
     const orderId = paymentData.order?.id || paymentData.order_id;
-    let orderData = null;
-    let postResponse = null;
-    if (orderId) {
-      const orderResponse = await axios.get(
-        `https://api.mercadopago.com/merchant_orders/${orderId}`,
-        {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-          },
-        }
-      );
 
-      orderData = orderResponse.data;
-      // Enviar orden a sistema externo
-
-      // Enviar orden a sistema externo
-      try {
-        await axios.post(
-          'https://orquestador-577166035685.us-central1.run.app/app/webhook/orquestador',
-          orderData
-        );
-      } catch (error) {
-        console.error('Error al enviar datos al endpoint externo:', error.response?.data || error.message);
-        return res.status(500).json({
-          error: 'Error al enviar los datos a la URL externa',
-          detalles: error.response?.data || error.message,
-        });
-      }
+    if (!orderId) {
+      console.warn('No se encontró un order_id en el pago recibido');
+      return res.sendStatus(200); // Se responde igual con 200, aunque no haya order
     }
 
+    // Obtener datos de la orden
+    const orderResponse = await axios.get(
+      `https://api.mercadopago.com/merchant_orders/${orderId}`,
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      }
+    );
+
+    const orderData = orderResponse.data;
+
+    // Enviar datos al sistema externo
+    try {
+      await axios.post(
+        'https://orquestador-577166035685.us-central1.run.app/app/webhook/orquestador',
+        orderData
+      );
+    } catch (error) {
+      console.error('Error al enviar datos al endpoint externo:', error.response?.data || error.message);
+      // Puedes registrar el error, pero igual respondes 200 para que no reintenten la notificación
+    }
+
+    return res.sendStatus(200); // Todo bien
   } catch (error) {
     console.error('Error en consulta-link:', error.response?.data || error.message);
-    res.status(500).json({
-      error: 'Error en la consulta o envío de datos',
-      detalles: error.response?.data || error.message,
-    });
+    return res.sendStatus(200); // Respondemos 200 igual aunque haya error para evitar reintentos infinitos
   }
 });
 
