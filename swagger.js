@@ -1,5 +1,8 @@
 // swagger.js
+require('dotenv').config();
 const swaggerJSDoc = require('swagger-jsdoc');
+
+const URL_SWAGGER = process.env.URL_SWAGGER;
 
 const swaggerDefinition = {
   openapi: '3.0.0',
@@ -10,7 +13,7 @@ const swaggerDefinition = {
   },
   servers: [
     {
-      url: 'http://localhost:3000',
+      url: URL_SWAGGER,
       description: 'Servidor local',
     },
   ],
